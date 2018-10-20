@@ -4,29 +4,22 @@ declare(strict_types=1);
 
 namespace Crunz\Configuration;
 
-use Symfony\Component\Config\Definition\ConfigurationInterface;
-use Symfony\Component\Config\Definition\Processor;
-use Symfony\Component\PropertyAccess\Exception\AccessException;
-use Symfony\Component\PropertyAccess\PropertyAccessorInterface;
+use Crunz\Filesystem\FilesystemInterface;
+use Crunz\Path\Path;
 
 class Configuration
 {
     /** @var array */
     private $config;
-    /** @var PropertyAccessorInterface */
-    private $propertyAccessor;
+    /** @var ConfigurationParser */
+    private $configurationParser;
+    /** @var FilesystemInterface */
+    private $filesystem;
 
-    public function __construct(
-        ConfigurationInterface $configurationDefinition,
-        Processor $definitionProcessor,
-        FileParser $fileParser,
-        PropertyAccessorInterface $propertyAccessor
-    ) {
-        $this->propertyAccessor = $propertyAccessor;
-        $this->config = $definitionProcessor->processConfiguration(
-            $configurationDefinition,
-            $fileParser->parse($this->configFilePath())
-        );
+    public function __construct(ConfigurationParserInterface $configurationParser, FilesystemInterface $filesystem)
+    {
+        $this->configurationParser = $configurationParser;
+        $this->filesystem = $filesystem;
     }
 
     /**
@@ -39,36 +32,40 @@ class Configuration
      */
     public function get($key, $default = null)
     {
+        if (null === $this->config) {
+            $this->config = $this->configurationParser
+                ->parseConfig();
+        }
+
         if (\array_key_exists($key, $this->config)) {
             return $this->config[$key];
         }
 
-        $path = \implode(
-            '',
-            \array_map(
-                function ($keyPart) {
-                    return "[{$keyPart}]";
-                },
-                \explode('.', $key)
-            )
-        );
+        $parts = \explode('.', $key);
 
-        try {
-            return $this->propertyAccessor
-                ->getValue(
-                    $this->config,
-                    $path
-                )
-            ;
-        } catch (AccessException $exception) {
-            return $default;
+        $value = $this->config;
+        foreach ($parts as $part) {
+            if (!\is_array($value) || !\array_key_exists($part, $value)) {
+                return $default;
+            }
+
+            $value = $value[$part];
         }
+
+        return $value;
     }
 
-    private function configFilePath()
+    /** @return string */
+    public function getSourcePath()
     {
-        $config_file = CRUNZ_ROOT . '/crunz.yml';
+        $sourcePath = Path::create(
+            [
+                $this->filesystem
+                    ->getCwd(),
+                $this->get('source'),
+            ]
+        );
 
-        return \file_exists($config_file) ? $config_file : __DIR__ . '/../../crunz.yml';
+        return $sourcePath->toString();
     }
 }

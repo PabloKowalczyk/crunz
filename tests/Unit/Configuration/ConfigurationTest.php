@@ -5,18 +5,22 @@ declare(strict_types=1);
 namespace Crunz\Tests\Unit\Configuration;
 
 use Crunz\Configuration\Configuration;
-use Crunz\Configuration\FileParser;
+use Crunz\Configuration\ConfigurationParserInterface;
+use Crunz\Filesystem\FilesystemInterface;
 use PHPUnit\Framework\TestCase;
-use Symfony\Component\Config\Definition\ConfigurationInterface;
-use Symfony\Component\Config\Definition\Processor;
-use Symfony\Component\PropertyAccess\PropertyAccessor;
 
-class ConfigurationTest extends TestCase
+final class ConfigurationTest extends TestCase
 {
     /** @test */
     public function getCanReturnPathSplitByDot()
     {
-        $configuration = $this->createConfiguration();
+        $configuration = $this->createConfiguration(
+            [
+                'smtp' => [
+                    'port' => 1234,
+                ],
+            ]
+        );
 
         $this->assertSame(1234, $configuration->get('smtp.port'));
     }
@@ -30,32 +34,18 @@ class ConfigurationTest extends TestCase
         $this->assertSame('anon', $configuration->get('notExist', 'anon'));
     }
 
-    private function createConfiguration()
+    /** @return Configuration */
+    private function createConfiguration(array $config = [])
     {
-        $mockDefinitionProcessor = $this->createMock(Processor::class);
-        $mockFileParser = $this->createMock(FileParser::class);
-        $mockConfigurationDefinition = $this->createMock(ConfigurationInterface::class);
-
-        $mockDefinitionProcessor
-            ->method('processConfiguration')
-            ->willReturn(
-                [
-                    'smtp' => [
-                        'port' => 1234,
-                    ],
-                ]
-            )
-        ;
-        $mockFileParser
-            ->method('parse')
-            ->willReturn([])
+        $mockConfigurationParser = $this->createMock(ConfigurationParserInterface::class);
+        $mockConfigurationParser
+            ->method('parseConfig')
+            ->willReturn($config)
         ;
 
         return new Configuration(
-            $mockConfigurationDefinition,
-            $mockDefinitionProcessor,
-            $mockFileParser,
-            new PropertyAccessor(false, true)
+            $mockConfigurationParser,
+            $this->createMock(FilesystemInterface::class)
         );
     }
 }

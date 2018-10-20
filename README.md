@@ -2,20 +2,26 @@
 
 Install a cron job once and for all, manage the rest from the code.
 
+Crunz is a framework-agnostic package to schedule periodic tasks (cron jobs) in PHP using a fluent API.
+
+Crunz is capable of executing any kind of executable command as well as PHP closures.
+
 [![Version](http://img.shields.io/packagist/v/lavary/crunz.svg?style=flat-square)](https://packagist.org/packages/lavary/crunz)
 [![PHP from Packagist](https://img.shields.io/packagist/php-v/lavary/crunz.svg?style=flat-square)](https://packagist.org/packages/lavary/crunz)
 [![Packagist](https://img.shields.io/packagist/dt/lavary/crunz.svg?style=flat-square)](https://packagist.org/packages/lavary/crunz/stats)
 [![Packagist](https://img.shields.io/packagist/dm/lavary/crunz.svg?style=flat-square)](https://packagist.org/packages/lavary/crunz/stats)
 
-|Version|Build status|
-|---|---|
-|stable (v1.6.1)|[![Build Status](https://img.shields.io/travis/lavary/crunz/v1.6.1.svg?style=flat-square)](https://travis-ci.org/lavary/crunz)|
-|v2 (v2.x-dev)|[![Build Status](https://img.shields.io/travis/lavary/crunz/master.svg?style=flat-square)](https://travis-ci.org/lavary/crunz)|
-|v1 (v1.x-dev)|[![Build Status](https://img.shields.io/travis/lavary/crunz/1.x.svg?style=flat-square)](https://travis-ci.org/lavary/crunz)|
+|Version|Linux build|Windows build|
+|---|---|---|
+|stable (v1.10.1)|[![Build Status](https://img.shields.io/travis/lavary/crunz/v1.10.1.svg?style=flat-square)](https://travis-ci.org/lavary/crunz)|*Tag build not supported*
+|v2 (master/v2.x-dev)|[![Build Status](https://img.shields.io/travis/lavary/crunz/master.svg?style=flat-square)](https://travis-ci.org/lavary/crunz)|[![AppVeyor branch](https://img.shields.io/appveyor/ci/lavary/crunz/master.svg?style=flat-square)](https://ci.appveyor.com/project/lavary/crunz)
+|v1 (v1.x-dev)|[![Build Status](https://img.shields.io/travis/lavary/crunz/1.x.svg?style=flat-square)](https://travis-ci.org/lavary/crunz)|[![AppVeyor branch](https://img.shields.io/appveyor/ci/lavary/crunz/1.x.svg?style=flat-square)](https://ci.appveyor.com/project/lavary/crunz)
 
-Crunz is a framework-agnostic package to schedule periodic tasks (cron jobs) in PHP using a fluent API.
-
-Crunz is capable of executing any kind of executable command as well as PHP closures.
+## Roadmap
+|Version|Release date|Active support until|Bug support until 
+|---|---|---|---|
+|v1 (v1.x-dev)|April 2016|April 2019|April 2020
+|v2 (master/v2.x-dev)|April 2019|April 2021|April 2022
 
 ## Installation
 
@@ -730,10 +736,23 @@ vendor/bin/crunz make:task --help
 
 ```
 
+## Contributing
+
+### Which branch should I choose?
+
+In most cases you should target branch `1.x`, as this is active development branch.
+Branch `master` is for future release, but all bugs/features should go to `1.x` anyway.
+
 ## If You Need Help
 
 Please submit all issues and questions using GitHub issues and I will try to help you.
 
+
+## Credits
+
+* [PabloKowalczyk](https://github.com/PabloKowalczyk)
+* [Reza Lavarian](https://github.com/lavary)
+* [All Contributors](https://github.com/lavary/crunz/graphs/contributors)
 
 ## License
 Crunz is free software distributed under the terms of the MIT license.

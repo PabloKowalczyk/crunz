@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace Crunz;
 
-use Carbon\Carbon;
 use Closure;
 use Cron\CronExpression;
+use Crunz\Clock\Clock;
+use Crunz\Clock\ClockInterface;
 use Crunz\Exception\NotImplementedException;
 use Crunz\Logger\Logger;
-use GuzzleHttp\Client as HttpClient;
+use Crunz\Path\Path;
+use Crunz\Pinger\PingableInterface;
+use Crunz\Pinger\PingableTrait;
 use SuperClosure\Serializer;
 use Symfony\Component\Process\Process;
 
@@ -19,8 +22,10 @@ use Symfony\Component\Process\Process;
  * @method self everyDay()    Run task every day.
  * @method self everyMonth()  Run task every month.
  */
-class Event
+class Event implements PingableInterface
 {
+    use PingableTrait;
+
     /**
      * Indicates if the command should not overlap itself.
      *
@@ -88,7 +93,7 @@ class Event
      *
      * @var string
      */
-    protected $expression = '* * * * * *';
+    protected $expression = '* * * * *';
 
     /**
      * The timezone the date should be evaluated on.
@@ -151,6 +156,8 @@ class Event
         'month' => 4,
         'week' => 5,
     ];
+    /** @var ClockInterface */
+    private static $clock;
 
     /**
      * Create a new event instance.
@@ -180,7 +187,7 @@ class Event
             throw new \BadMethodCallException();
         }
 
-        $amount = !empty($matches[1]) ? word2number(split_camel($matches[1])) : 1;
+        $amount = !empty($matches[1]) ? $this->wordToNumber($this->splitCamel($matches[1])) : 1;
 
         if (!$amount) {
             throw new \BadMethodCallException();
@@ -214,7 +221,7 @@ class Event
     }
 
     /**
-     * Build the comand string.
+     * Build the command string.
      *
      * @return string
      */
@@ -313,6 +320,21 @@ class Event
      */
     public function cron($expression)
     {
+        $parts = \preg_split(
+            '/\s/',
+            $expression,
+            -1,
+            PREG_SPLIT_NO_EMPTY
+        );
+
+        // @TODO Throw exception in v2
+        if (\count($parts) > 5) {
+            @\trigger_error(
+                'Using cron expression with more than 5 parts is deprecated from v1.9 and will result in exception in v2.0. If you are using dragonmantank/cron-expression package be aware that passing more than five parts to this method will result in exception.',
+                E_USER_DEPRECATED
+            );
+        }
+
         $this->expression = $expression;
 
         return $this;
@@ -325,7 +347,7 @@ class Event
      */
     public function hourly()
     {
-        return $this->cron('0 * * * * *');
+        return $this->cron('0 * * * *');
     }
 
     /**
@@ -335,7 +357,7 @@ class Event
      */
     public function daily()
     {
-        return $this->cron('0 0 * * * *');
+        return $this->cron('0 0 * * *');
     }
 
     /**
@@ -348,11 +370,11 @@ class Event
     public function on($date)
     {
         $date = \date_parse($date);
-        $segments = \array_only($date, \array_flip($this->fieldsPosition));
+        $segments = \array_intersect_key($date, $this->fieldsPosition);
 
         if ($date['year']) {
-            $this->skip(function () use ($segments) {
-                return (int) \date('Y') !== $segments['year'];
+            $this->skip(function () use ($date) {
+                return (int) \date('Y') !== $date['year'];
             });
         }
 
@@ -528,7 +550,7 @@ class Event
      */
     public function weekly()
     {
-        return $this->cron('0 0 * * 0 *');
+        return $this->cron('0 0 * * 0');
     }
 
     /**
@@ -553,7 +575,7 @@ class Event
      */
     public function monthly()
     {
-        return $this->cron('0 0 1 * * *');
+        return $this->cron('0 0 1 * *');
     }
 
     /**
@@ -563,7 +585,7 @@ class Event
      */
     public function quarterly()
     {
-        return $this->cron('0 0 1 */3 * *');
+        return $this->cron('0 0 1 */3 *');
     }
 
     /**
@@ -573,7 +595,7 @@ class Event
      */
     public function yearly()
     {
-        return $this->cron('0 0 1 1 * *');
+        return $this->cron('0 0 1 1 *');
     }
 
     /**
@@ -777,20 +799,6 @@ class Event
     }
 
     /**
-     * Register a callback to ping a given URL before the job runs.
-     *
-     * @param string $url
-     *
-     * @return $this
-     */
-    public function pingBefore($url)
-    {
-        return $this->before(function () use ($url) {
-            (new HttpClient())->get($url);
-        });
-    }
-
-    /**
      * Register a callback to be called before the operation.
      *
      * @param \Closure $callback
@@ -802,20 +810,6 @@ class Event
         $this->beforeCallbacks[] = $callback;
 
         return $this;
-    }
-
-    /**
-     * Register a callback to ping a given URL after the job runs.
-     *
-     * @param string $url
-     *
-     * @return $this
-     */
-    public function thenPing($url)
-    {
-        return $this->then(function () use ($url) {
-            (new HttpClient())->get($url);
-        });
     }
 
     /**
@@ -1095,9 +1089,9 @@ class Event
     {
         $closure = (new Serializer())->serialize($closure);
         $serializedClosure = \http_build_query([$closure]);
-        $crunzRoot = CRUNZ_ROOT . DIRECTORY_SEPARATOR;
+        $crunzRoot = Path::create([\getcwd(), 'crunz']);
 
-        return PHP_BINARY . " {$crunzRoot}crunz closure:run {$serializedClosure}";
+        return PHP_BINARY . " {$crunzRoot->toString()} closure:run {$serializedClosure}";
     }
 
     /**
@@ -1107,14 +1101,15 @@ class Event
      */
     protected function expressionPasses(\DateTimeZone $timeZone)
     {
-        $date = Carbon::now();
-        $date->setTimezone($timeZone);
+        $now = $this->getClock()
+            ->now();
+        $now = $now->setTimezone($timeZone);
 
         if ($this->timezone) {
-            $date->setTimezone($this->timezone);
+            $now = $now->setTimezone(new \DateTimeZone($this->timezone));
         }
 
-        return CronExpression::factory($this->expression)->isDue($date->toDateTimeString());
+        return CronExpression::factory($this->expression)->isDue($now->format('Y-m-d H:i:s'));
     }
 
     /**
@@ -1188,6 +1183,29 @@ class Event
         \file_put_contents($this->lockFile(), $this->process->getPid());
     }
 
+    /** @return ClockInterface */
+    private function getClock()
+    {
+        if (null === self::$clock) {
+            self::$clock = new Clock();
+        }
+
+        return self::$clock;
+    }
+
+    private function splitCamel($text)
+    {
+        $pattern = '/(?<=[a-z])(?=[A-Z])/x';
+        $segments = \preg_split($pattern, $text);
+
+        return \mb_strtolower(
+            \implode(
+                $segments,
+                ' '
+            )
+        );
+    }
+
     private function isWindows()
     {
         $osCode = \mb_substr(
@@ -1197,5 +1215,82 @@ class Event
         );
 
         return 'WIN' === $osCode;
+    }
+
+    private function wordToNumber($text)
+    {
+        $data = \strtr(
+            $text,
+            [
+                'zero' => '0',
+                'a' => '1',
+                'one' => '1',
+                'two' => '2',
+                'three' => '3',
+                'four' => '4',
+                'five' => '5',
+                'six' => '6',
+                'seven' => '7',
+                'eight' => '8',
+                'nine' => '9',
+                'ten' => '10',
+                'eleven' => '11',
+                'twelve' => '12',
+                'thirteen' => '13',
+                'fourteen' => '14',
+                'fifteen' => '15',
+                'sixteen' => '16',
+                'seventeen' => '17',
+                'eighteen' => '18',
+                'nineteen' => '19',
+                'twenty' => '20',
+                'thirty' => '30',
+                'forty' => '40',
+                'fourty' => '40',
+                'fifty' => '50',
+                'sixty' => '60',
+                'seventy' => '70',
+                'eighty' => '80',
+                'ninety' => '90',
+                'hundred' => '100',
+                'thousand' => '1000',
+                'million' => '1000000',
+                'billion' => '1000000000',
+                'and' => '',
+            ]
+        );
+
+        // Coerce all tokens to numbers
+        $parts = \array_map(
+            function ($val) {
+                return (float) $val;
+            },
+            \preg_split('/[\s-]+/', $data)
+        );
+
+        $tmp = null;
+        $sum = 0;
+        $last = null;
+
+        foreach ($parts as $part) {
+            if (null !== $tmp) {
+                if ($tmp > $part) {
+                    if ($last >= 1000) {
+                        $sum += $tmp;
+                        $tmp = $part;
+                    } else {
+                        $tmp += $part;
+                    }
+                } else {
+                    $tmp *= $part;
+                }
+            } else {
+                $tmp = $part;
+            }
+
+            $last = $part;
+        }
+
+        return $sum + $tmp;
     }
 }

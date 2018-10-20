@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Crunz\Console\Command;
 
 use Crunz\Configuration\Configuration;
+use Crunz\Path\Path;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -145,7 +146,9 @@ class TaskGeneratorCommand extends Command
      */
     protected function save()
     {
-        return \file_put_contents($this->outputPath() . DIRECTORY_SEPARATOR . $this->outputFile(), $this->stub);
+        $filename = Path::create([$this->outputPath(), $this->outputFile()]);
+
+        return \file_put_contents($filename->toString(), $this->stub);
     }
 
     /**
@@ -171,10 +174,10 @@ class TaskGeneratorCommand extends Command
     protected function outputPath()
     {
         $source = $this->config
-            ->get('source')
+            ->getSourcePath()
         ;
         $destination = $this->ask('Where do you want to save the file? (Press enter for the current directory)');
-        $outputPath = null !== $destination ? $destination : generate_path($source);
+        $outputPath = null !== $destination ? $destination : $source;
 
         if (!\file_exists($outputPath)) {
             \mkdir($outputPath, 0744, true);

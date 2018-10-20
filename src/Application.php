@@ -4,18 +4,17 @@ declare(strict_types=1);
 
 namespace Crunz;
 
+use Crunz\Path\Path;
 use Symfony\Component\Config\ConfigCache;
 use Symfony\Component\Config\FileLocator;
 use Symfony\Component\Console\Application as SymfonyApplication;
-use Symfony\Component\Console\Input\ArgvInput;
 use Symfony\Component\Console\Input\InputInterface;
-use Symfony\Component\Console\Output\ConsoleOutput;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\DependencyInjection\Container;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Dumper\PhpDumper;
-use Symfony\Component\DependencyInjection\Loader\XmlFileLoader;
+use Symfony\Component\DependencyInjection\Loader\PhpFileLoader;
 
 class Application extends SymfonyApplication
 {
@@ -73,48 +72,58 @@ class Application extends SymfonyApplication
     public function run(InputInterface $input = null, OutputInterface $output = null)
     {
         if (null === $output) {
-            $output = new ConsoleOutput();
+            $output = $this->container
+                ->get(OutputInterface::class);
         }
 
         if (null === $input) {
-            $input = new ArgvInput();
+            $input = $this->container
+                ->get(InputInterface::class);
         }
 
-        $this->registerDeprecationHandler($input, $output);
+        $this->registerDeprecationHandler();
 
         return parent::run($input, $output);
     }
 
     private function initializeContainer()
     {
-        $class = 'CrunzContainer';
-        $baseClass = 'Container';
-        $cache = new ConfigCache(
-            \implode(
-                DIRECTORY_SEPARATOR,
+        $containerCacheDirWritable = $this->createBaseCacheDirectory();
+
+        if ($containerCacheDirWritable) {
+            $class = 'CrunzContainer';
+            $baseClass = 'Container';
+            $cachePath = Path::create(
                 [
-                    $this->getCacheDir(),
+                    $this->getContainerCacheDir(),
                     "{$class}.php",
                 ]
-            ),
-            true
-        );
-
-        if (!$cache->isFresh()) {
-            $containerBuilder = $this->buildContainer();
-            $containerBuilder->compile();
-
-            $this->dumpContainer(
-                $cache,
-                $containerBuilder,
-                $class,
-                $baseClass
             );
+            $cache = new ConfigCache($cachePath->toString(), true);
+
+            if (!$cache->isFresh()) {
+                $containerBuilder = $this->buildContainer();
+                $containerBuilder->compile();
+
+                $this->dumpContainer(
+                    $cache,
+                    $containerBuilder,
+                    $class,
+                    $baseClass
+                );
+            }
+
+            require_once $cache->getPath();
+
+            $this->container = new $class();
+
+            return;
         }
 
-        require_once $cache->getPath();
+        $containerBuilder = $this->buildContainer();
+        $containerBuilder->compile();
 
-        $this->container = new $class();
+        $this->container = $containerBuilder;
     }
 
     /**
@@ -125,9 +134,7 @@ class Application extends SymfonyApplication
     private function buildContainer()
     {
         $containerBuilder = new ContainerBuilder();
-
-        $configDir = \implode(
-            DIRECTORY_SEPARATOR,
+        $configDir = Path::create(
             [
                 __DIR__,
                 '..',
@@ -135,8 +142,8 @@ class Application extends SymfonyApplication
             ]
         );
 
-        $loader = new XmlFileLoader($containerBuilder, new FileLocator($configDir));
-        $loader->load('services.xml');
+        $phpLoader = new PhpFileLoader($containerBuilder, new FileLocator($configDir->toString()));
+        $phpLoader->load('services.php');
 
         return $containerBuilder;
     }
@@ -161,22 +168,64 @@ class Application extends SymfonyApplication
     }
 
     /**
-     * @return string
+     * @return bool
      */
-    private function getCacheDir()
+    private function createBaseCacheDirectory()
     {
-        return \implode(
-            DIRECTORY_SEPARATOR,
-            [
-                \sys_get_temp_dir(),
-                'crunz',
-            ]
-        );
+        $baseCacheDir = $this->getBaseCacheDir();
+
+        if (!\is_dir($baseCacheDir)) {
+            $makeDirResult = \mkdir(
+                $this->getBaseCacheDir(),
+                0777,
+                true
+            );
+
+            return $makeDirResult
+                && \is_dir($baseCacheDir)
+                && \is_writable($baseCacheDir)
+            ;
+        }
+
+        return \is_writable($baseCacheDir);
     }
 
-    private function registerDeprecationHandler(InputInterface $input, OutputInterface $output)
+    /**
+     * @return string
+     */
+    private function getBaseCacheDir()
     {
-        $io = new SymfonyStyle($input, $output);
+        $baseCacheDir = Path::create(
+            [
+                \sys_get_temp_dir(),
+                '.crunz',
+            ]
+        );
+
+        return $baseCacheDir->toString();
+    }
+
+    /**
+     * @return string
+     */
+    private function getContainerCacheDir()
+    {
+        $containerCacheDir = Path::create(
+            [
+                $this->getBaseCacheDir(),
+                \get_current_user(),
+                $this->getVersion(),
+            ]
+        );
+
+        return $containerCacheDir->toString();
+    }
+
+    private function registerDeprecationHandler()
+    {
+        $io = $this->container
+            ->get(SymfonyStyle::class);
+
         \set_error_handler(
             function (
                 $errorNumber,
