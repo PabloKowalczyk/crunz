@@ -56,6 +56,7 @@ class Application extends SymfonyApplication
     {
         parent::__construct($appName, $appVersion);
 
+        $this->displayErrors();
         $this->initializeContainer();
 
         foreach (self::COMMANDS as $commandClass) {
@@ -241,5 +242,12 @@ class Application extends SymfonyApplication
             },
             E_USER_DEPRECATED
         );
+    }
+
+    private function displayErrors()
+    {
+        \ini_set('display_errors', 1);
+        \ini_set('display_startup_errors', 1);
+        \error_reporting(E_ALL);
     }
 }
