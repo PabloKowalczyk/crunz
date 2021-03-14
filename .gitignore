@@ -10,4 +10,5 @@ var/
 .php_cs.cache
 /crunz.phar
 /crunz.yml
+/crunz.php
 /.phpunit.result.cache
