@@ -81,6 +81,10 @@ final class DebugTaskCommand extends Command
                         : $command,
                 ],
                 [
+                    'Id',
+                    $taskInformation->id(),
+                ],
+                [
                     'Description',
                     $taskInformation->description(),
                 ],

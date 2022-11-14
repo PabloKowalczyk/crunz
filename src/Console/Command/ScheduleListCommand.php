@@ -93,6 +93,7 @@ class ScheduleListCommand extends \Symfony\Component\Console\Command\Command
      *     int,
      *     array{
      *         number: int,
+     *         id: string,
      *         task: string,
      *         expression: string,
      *         command: string,
@@ -117,6 +118,7 @@ class ScheduleListCommand extends \Symfony\Component\Console\Command\Command
             foreach ($events as $event) {
                 $tasksList[] = [
                     'number' => ++$number,
+                    'id' => $event->getProvidedId() ?? '',
                     'task' => $event->description ?? '',
                     'expression' => $event->getExpression(),
                     'command' => $event->getCommandForDisplay(),
@@ -149,6 +151,7 @@ class ScheduleListCommand extends \Symfony\Component\Console\Command\Command
      *     int,
      *     array{
      *         number: int,
+     *         id: string,
      *         task: string,
      *         expression: string,
      *         command: string,
@@ -166,6 +169,7 @@ class ScheduleListCommand extends \Symfony\Component\Console\Command\Command
                 $table->setHeaders(
                     [
                         '#',
+                        'Id',
                         'Task',
                         'Expression',
                         'Command to Run',

@@ -420,6 +420,37 @@ final class EventTest extends UnitTestCase
         $event->preventOverlapping($store);
     }
 
+    public function test_provided_id_can_be_set_and_get(): void
+    {
+        // Arrange
+        $providedId = Faker::word();
+        $event = $this->createEvent();
+
+        // Act
+        $event->setProvidedId($providedId);
+
+        // Assert
+        self::assertSame($providedId, $event->getProvidedId());
+    }
+
+    /** @dataProvider invalidProvidedIdProvider */
+    public function test_invalid_data_passed_to_set_provided_id(\Closure $paramsGenerator): void
+    {
+        // Arrange
+        [
+            'providedId' => $providedId,
+            'expectedExceptionMessage' => $expectedExceptionMessage,
+        ] = $paramsGenerator();
+        $event = $this->createEvent();
+
+        // Expected
+        $this->expectException(CrunzException::class);
+        $this->expectExceptionMessage($expectedExceptionMessage);
+
+        // Act
+        $event->setProvidedId($providedId);
+    }
+
     /** @return iterable<string,array> */
     public function deprecatedEveryProvider(): iterable
     {
@@ -457,6 +488,24 @@ final class EventTest extends UnitTestCase
         yield 'minute above fifty nine' => [
             Faker::int(60, 120),
             "Minute cannot be greater than '59'.",
+        ];
+    }
+
+    /** @return iterable<string, array{\Closure}> */
+    public function invalidProvidedIdProvider(): iterable
+    {
+        yield 'empty string' => [
+            static fn (): array => [
+                'providedId' => '',
+                'expectedExceptionMessage' => 'Id cannot be empty string.',
+            ],
+        ];
+
+        yield 'numeric string' => [
+            static fn (): array => [
+                'providedId' => (string) Faker::int(),
+                'expectedExceptionMessage' => 'Id must be non-numeric.',
+            ],
         ];
     }
 

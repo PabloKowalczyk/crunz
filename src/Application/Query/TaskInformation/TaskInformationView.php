@@ -11,6 +11,7 @@ final class TaskInformationView
 
     public function __construct(
         private string|object $command,
+        private string $id,
         private string $description,
         private string $cronExpression,
         private bool $preventOverlapping,
@@ -56,5 +57,10 @@ final class TaskInformationView
     public function preventOverlapping(): bool
     {
         return $this->preventOverlapping;
+    }
+
+    public function id(): string
+    {
+        return $this->id;
     }
 }

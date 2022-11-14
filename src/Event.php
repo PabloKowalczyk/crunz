@@ -164,6 +164,7 @@ class Event implements PingableInterface
     private $lock;
     /** @var \Closure[] */
     private array $errorCallbacks = [];
+    private ?string $providedId = null;
 
     /**
      * Create a new event instance.
@@ -1073,6 +1074,26 @@ class Event implements PingableInterface
     public function everySixHours(): self
     {
         return $this->cron('0 */6 * * *');
+    }
+
+    public function setProvidedId(string|null $id): self
+    {
+        if ('' === $id) {
+            throw new CrunzException('Id cannot be empty string.');
+        }
+
+        if (null !== $id && true === \is_numeric($id)) {
+            throw new CrunzException('Id must be non-numeric.');
+        }
+
+        $this->providedId = $id;
+
+        return $this;
+    }
+
+    public function getProvidedId(): string|null
+    {
+        return $this->providedId;
     }
 
     /**

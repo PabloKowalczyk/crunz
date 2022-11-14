@@ -65,6 +65,7 @@ final class TaskInformationHandler
 
         return new TaskInformationView(
             $event->getCommand(),
+            $event->getProvidedId() ?? '',
             $event->description ?? '',
             $event->getExpression(),
             \filter_var($eventProperties['preventOverlapping'] ?? false, FILTER_VALIDATE_BOOLEAN),
